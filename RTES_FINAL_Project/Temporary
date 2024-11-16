@@ -1,0 +1,2 @@
+SPI spi(PF_9, PF_8, PF_7, PC_1, use_gpio_ssel); // SPI instance
+uint8_t write_buf[32], read_buf[32];

@@ -1,12 +1,12 @@
 #include "sensor.h"
 
 #define CTRL_REG1 0x20
-#define CTRL_REG1_CONFIG 0b01'10'1'1'1'1
+#define CTRL_REG1_CONFIG 0b01'10'1'1'1'1 
 #define CTRL_REG4 0x23
 #define CTRL_REG4_CONFIG 0b0'0'01'0'00'0
 #define SPI_FLAG 1
 #define OUT_X_L 0x28
-#define SCALING_FACTOR (17.5f * 0.0174532925199432957692236907684886f / 1000.0f)
+#define SCALING_FACTOR (0.017500f * 0.010526f)
 
 EventFlags flags;
 
@@ -37,8 +37,4 @@ void read_sensor_data(SPI &spi, uint8_t *write_buf, uint8_t *read_buf, float &gx
     gx = ((float)raw_gx) * SCALING_FACTOR;
     gy = ((float)raw_gy) * SCALING_FACTOR;
     gz = ((float)raw_gz) * SCALING_FACTOR;
-}
-
-void print_data(float gx, float gy, float gz) {
-    printf("teleplot:gx=%f,gy=%f,gz=%f\n", gx, gy, gz);
 }
