@@ -1,12 +1,19 @@
 #include "sensor.h"
+#include "mbed.h"
 
+// Register addresses
 #define CTRL_REG1 0x20
-#define CTRL_REG1_CONFIG 0b01'10'1'1'1'1 
 #define CTRL_REG4 0x23
-#define CTRL_REG4_CONFIG 0b0'0'01'0'00'0
-#define SPI_FLAG 1
 #define OUT_X_L 0x28
-#define SCALING_FACTOR (0.017500f * 0.010526f)
+
+// Register configurations
+#define CTRL_REG1_CONFIG 0b01'11'1'1'1'1  // ODR 760Hz, Cut-off 100, Normal mode, X, Y, Z enabled
+#define CTRL_REG4_CONFIG 0b0'0'10'0'00'0  // ±500 dps scale
+
+#define SPI_FLAG 1
+
+// Sensitivity for ±500 dps scale (from datasheet)
+#define SENSITIVITY 0.017500f  // 17.50 mdps/digit
 
 EventFlags flags;
 
@@ -25,16 +32,16 @@ void init_spi(SPI &spi, uint8_t *write_buf, uint8_t *read_buf) {
 }
 
 void read_sensor_data(SPI &spi, uint8_t *write_buf, uint8_t *read_buf, float &gx, float &gy, float &gz) {
-    uint16_t raw_gx, raw_gy, raw_gz;
+    int16_t raw_gx, raw_gy, raw_gz;
 
-    write_buf[0] = OUT_X_L | 0x80 | 0x40;
+    write_buf[0] = OUT_X_L | 0x80 | 0x40;  // Read operation, auto-increment
     spi.transfer(write_buf, 7, read_buf, 7, spi_cb);
 
-    raw_gx = (((uint16_t)read_buf[2]) << 8) | ((uint16_t)read_buf[1]);
-    raw_gy = (((uint16_t)read_buf[4]) << 8) | ((uint16_t)read_buf[3]);
-    raw_gz = (((uint16_t)read_buf[6]) << 8) | ((uint16_t)read_buf[5]);
+    raw_gx = (int16_t)((read_buf[2] << 8) | read_buf[1]);
+    raw_gy = (int16_t)((read_buf[4] << 8) | read_buf[3]);
+    raw_gz = (int16_t)((read_buf[6] << 8) | read_buf[5]);
 
-    gx = ((float)raw_gx) * SCALING_FACTOR;
-    gy = ((float)raw_gy) * SCALING_FACTOR;
-    gz = ((float)raw_gz) * SCALING_FACTOR;
+    gx = (float)raw_gx * SENSITIVITY;
+    gy = (float)raw_gy * SENSITIVITY;
+    gz = (float)raw_gz * SENSITIVITY;
 }

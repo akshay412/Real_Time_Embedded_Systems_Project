@@ -5,33 +5,37 @@
 #include <map>
 #include <algorithm>
 
+//Calibration and Analysis
 const int WINDOW_SIZE = 5;
 std::vector<float> window_x(WINDOW_SIZE), window_y(WINDOW_SIZE), window_z(WINDOW_SIZE);
 int window_index = 0;
+const int CALIBRATION_SAMPLES = 100;
+float gx_offset = 0, gy_offset = 0, gz_offset = 0;
 
 // SPI pins
 SPI spi(PF_9, PF_8, PF_7, PC_1, use_gpio_ssel); // SPI instance
 uint8_t write_buf[32], read_buf[32];
+
 // LED pins
 LEDController led_controller(LED2, LED1);
 
-// Calibration
-const int CALIBRATION_SAMPLES = 100;
-float gx_offset = 0, gy_offset = 0, gz_offset = 0;
-// Initialize button
+// Button for recording
 InterruptIn button(BUTTON1);
 
-// Variable for button press
-volatile bool recording = false;
+// Constants for recording
+const int MAX_SAMPLES = 100;               // Maximum number of samples
+const int RECORDING_DURATION_MS = 3000;    // Recording duration in milliseconds
+const int SAMPLING_INTERVAL_MS = RECORDING_DURATION_MS / MAX_SAMPLES; // Interval between samples
 
-// Variables for recording gesture
-const int MAX_SAMPLES = 100;
-const int RECORDING_DURATION_MS = 5000; // 5 seconds
-int sample_count = 0;
-float gesture_data[MAX_SAMPLES][3]; // Buffer to store 100 samples of gx, gy, gz
+// Buffers for gesture data
+float recorded_gesture_data[MAX_SAMPLES][3]; // Buffer for reference gesture
+float gesture_data[MAX_SAMPLES][3];          // Buffer for test gesture
 
-// Initialize Timer
-Timer recording_timer;
+// Timer and Variables
+Timer sample_timer;   // Timer for sampling intervals
+int sample_count = 0; // Sample counter
+volatile bool recording = false; // Flag to indicate recording state
+volatile bool key_recording = true; // Flag to indicate recording state
 
 // Function to find mode
 float find_mode(std::vector<float>& data) {
@@ -88,76 +92,88 @@ void apply_median_filter(float& gx, float& gy, float& gz) {
     gz = find_median(temp_z);
 }
 
-// Function to record gesture
-void start_recording() {
-    if (!recording) {
-        recording = true;
-        sample_count = 0;
-        led_controller.turn_on_red(); // Turn on red LED to indicate recording
-        recording_timer.start();
-        printf("Recording started. Perform the gesture now.\n");
-    }
-}
-
-// Function to record gesture
-void record_sample() {
-    if (recording && sample_count < MAX_SAMPLES) {
-        float gx, gy, gz;
-        read_sensor_data(spi, write_buf, read_buf, gx, gy, gz);
-        
-        // Apply offsets
-        gx -= gx_offset;
-        gy -= gy_offset;
-        gz -= gz_offset;
-
-        // Apply median filter
-        apply_median_filter(gx, gy, gz);
-
-        gesture_data[sample_count][0] = gx;
-        gesture_data[sample_count][1] = gy;
-        gesture_data[sample_count][2] = gz;
-        
-        sample_count++;
-        
-        // Toggle green LED to show activity
-        led_controller.toggle_green();
-        
-        if (sample_count >= MAX_SAMPLES || recording_timer.read_ms() >= RECORDING_DURATION_MS) {
-            recording = false;
-            recording_timer.stop();
-            recording_timer.reset();
+// Function to record data into the target buffer
+void record_key() {
+    sample_timer.start();
+    if(sample_timer.read_ms() >=sample_count* SAMPLING_INTERVAL_MS) {
+        if(sample_count < MAX_SAMPLES) {
+            float gx, gy, gz;
+            read_sensor_data(spi, write_buf, read_buf, gx, gy, gz);
+            gx-=gx_offset;
+            gy-=gy_offset;
+            gz-=gz_offset;
+            apply_median_filter(gx, gy, gz);
+            printf("gx=%f, gy=%f, gz=%f\n", gx, gy, gz);
+            recorded_gesture_data[sample_count][0] = gx;
+            recorded_gesture_data[sample_count][1] = gy;
+            recorded_gesture_data[sample_count][2] = gz;
+            sample_count++;
+            led_controller.toggle_green();
+        } else {
+            key_recording = false;
             led_controller.turn_off_green();
-            led_controller.turn_off_red();
-            printf("Recording complete. %d samples recorded.\n", sample_count);
+            sample_count = 0;
+            sample_timer.stop();
         }
     }
 }
 
-// Read and output sensor data
-void read_and_output_sensor() {
-    float gx, gy, gz;
-    read_sensor_data(spi, write_buf, read_buf, gx, gy, gz);
-    gx-=gx_offset;
-    gy-=gy_offset;
-    gz-=gz_offset;
-    apply_median_filter(gx, gy, gz);
-    printf("Gyroscope values: gx=%f, gy=%f, gz=%f\n", gx, gy, gz);
+void record_gesture_data() {
+    sample_timer.start();
+    if (recording) {
+        if(sample_timer.read_ms() >= sample_count*SAMPLING_INTERVAL_MS) {
+            if(sample_count < MAX_SAMPLES) {
+                float gx, gy, gz;
+                read_sensor_data(spi, write_buf, read_buf, gx, gy, gz);
+                            gx-=gx_offset;
+            gy-=gy_offset;
+            gz-=gz_offset;
+            apply_median_filter(gx, gy, gz);
+                printf("gx=%f, gy=%f, gz=%f\n", gx, gy, gz);
+                gesture_data[sample_count][0] = gx;
+                gesture_data[sample_count][1] = gy;
+                gesture_data[sample_count][2] = gz;
+                sample_count++;
+                led_controller.toggle_green();
+            } else {
+                recording = false;
+                led_controller.turn_off_green();
+                sample_count = 0;
+                sample_timer.stop();
+            }
+        }
+    }
 }
 
+// ISR for button press (start recording)
+void button_pressed_isr() {
+        recording = true;
+}
+
+// Main function
 int main() {
+    led_controller.turn_on_red();
+    led_controller.turn_off_green();
+    key_recording=true;
+    recording=false;
+    // Initialize SPI
     init_spi(spi, write_buf, read_buf);
-    
+    thread_sleep_for(1000);
     // Calibrate sensor
     calibrate_sensor();
+    thread_sleep_for(5000);
+    // Start the sample timer once, not resetting it until necessary
     
-    button.fall([]() { start_recording(); });
-    
+    // Attach the ISR to the button press event
+    button.fall(&button_pressed_isr); // Use falling edge for button press
     while (1) {
-        if (recording) {
-            record_sample();
+        // Call the appropriate function based on the recording state
+        if(key_recording) {
+            record_key();
         } else {
-            read_and_output_sensor();
+            if(recording) {
+                record_gesture_data();
+            }
         }
-        ThisThread::sleep_for(50ms); // Adjust this delay to get approximately 100 samples in 5 seconds
     }
 }
