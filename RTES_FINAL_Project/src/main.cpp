@@ -23,7 +23,7 @@ LEDController led_controller(LED2, LED1);
 InterruptIn button(BUTTON1);
 
 // Constants for recording
-const int MAX_SAMPLES = 100;               // Maximum number of samples
+const int MAX_SAMPLES = 300;               // Maximum number of samples
 const int RECORDING_DURATION_MS = 3000;    // Recording duration in milliseconds
 const int SAMPLING_INTERVAL_MS = RECORDING_DURATION_MS / MAX_SAMPLES; // Interval between samples
 
@@ -36,7 +36,6 @@ Timer sample_timer;   // Timer for sampling intervals
 int sample_count = 0; // Sample counter
 volatile bool recording = false; // Flag to indicate recording state
 volatile bool key_recording = true; // Flag to indicate recording state
-
 // Function to find mode
 float find_mode(std::vector<float>& data) {
     std::map<float, int> frequency_map;
@@ -91,7 +90,12 @@ void apply_median_filter(float& gx, float& gy, float& gz) {
     gy = find_median(temp_y);
     gz = find_median(temp_z);
 }
-
+//Printing data
+void print_data(float buffer[MAX_SAMPLES][3]) {
+    for (int i = 0; i < MAX_SAMPLES; ++i) {
+        printf("gx=%f, gy=%f, gz=%f\n", buffer[i][0], buffer[i][1], buffer[i][2]);
+    }
+}
 // Function to record data into the target buffer
 void record_key() {
     sample_timer.start();
@@ -103,18 +107,18 @@ void record_key() {
             gy-=gy_offset;
             gz-=gz_offset;
             apply_median_filter(gx, gy, gz);
-            printf("gx=%f, gy=%f, gz=%f\n", gx, gy, gz);
             recorded_gesture_data[sample_count][0] = gx;
             recorded_gesture_data[sample_count][1] = gy;
             recorded_gesture_data[sample_count][2] = gz;
             sample_count++;
             sample_timer.reset();
-            led_controller.toggle_green();
+            led_controller.turn_on_green();
         } else {
             key_recording = false;
             led_controller.turn_off_green();
             sample_count = 0;
             sample_timer.stop();
+            print_data(recorded_gesture_data);
         }
     }
 }
@@ -130,22 +134,23 @@ void record_gesture_data() {
             gy-=gy_offset;
             gz-=gz_offset;
             apply_median_filter(gx, gy, gz);
-                printf("gx=%f, gy=%f, gz=%f\n", gx, gy, gz);
                 gesture_data[sample_count][0] = gx;
                 gesture_data[sample_count][1] = gy;
                 gesture_data[sample_count][2] = gz;
                 sample_count++;
                 sample_timer.reset();
-                led_controller.toggle_green();
+                led_controller.turn_on_green();
             } else {
                 recording = false;
                 led_controller.turn_off_green();
                 sample_count = 0;
                 sample_timer.stop();
+                print_data(gesture_data);
             }
         }
     }
 }
+
 
 // ISR for button press (start recording)
 void button_pressed_isr() {
