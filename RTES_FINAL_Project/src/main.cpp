@@ -95,7 +95,7 @@ void apply_median_filter(float& gx, float& gy, float& gz) {
 // Function to record data into the target buffer
 void record_key() {
     sample_timer.start();
-    if(sample_timer.read_ms() >=sample_count* SAMPLING_INTERVAL_MS) {
+    if(sample_timer.read_ms() >= SAMPLING_INTERVAL_MS) {
         if(sample_count < MAX_SAMPLES) {
             float gx, gy, gz;
             read_sensor_data(spi, write_buf, read_buf, gx, gy, gz);
@@ -108,12 +108,15 @@ void record_key() {
             recorded_gesture_data[sample_count][1] = gy;
             recorded_gesture_data[sample_count][2] = gz;
             sample_count++;
+            sample_timer.reset();
             led_controller.toggle_green();
         } else {
             key_recording = false;
             led_controller.turn_off_green();
+            led_controller.turn_off_red();
             sample_count = 0;
             sample_timer.stop();
+            led_controller.turn_off_green();
         }
     }
 }
@@ -121,7 +124,7 @@ void record_key() {
 void record_gesture_data() {
     sample_timer.start();
     if (recording) {
-        if(sample_timer.read_ms() >= sample_count*SAMPLING_INTERVAL_MS) {
+        if(sample_timer.read_ms() >= SAMPLING_INTERVAL_MS) {
             if(sample_count < MAX_SAMPLES) {
                 float gx, gy, gz;
                 read_sensor_data(spi, write_buf, read_buf, gx, gy, gz);
@@ -134,12 +137,15 @@ void record_gesture_data() {
                 gesture_data[sample_count][1] = gy;
                 gesture_data[sample_count][2] = gz;
                 sample_count++;
+                sample_timer.reset();
                 led_controller.toggle_green();
             } else {
                 recording = false;
                 led_controller.turn_off_green();
+                led_controller.turn_off_red();
                 sample_count = 0;
                 sample_timer.stop();
+                led_controller.turn_off_green();
             }
         }
     }
