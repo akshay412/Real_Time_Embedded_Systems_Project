@@ -23,7 +23,7 @@ LEDController led_controller(LED2, LED1);
 InterruptIn button(BUTTON1);
 
 // Constants for recording
-const int MAX_SAMPLES = 300;               // Maximum number of samples
+const int MAX_SAMPLES = 200;               // Maximum number of samples
 const int RECORDING_DURATION_MS = 3000;    // Recording duration in milliseconds
 const int SAMPLING_INTERVAL_MS = RECORDING_DURATION_MS / MAX_SAMPLES; // Interval between samples
 

@@ -1,2 +1,168 @@
-SPI spi(PF_9, PF_8, PF_7, PC_1, use_gpio_ssel); // SPI instance
-uint8_t write_buf[32], read_buf[32];
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter
+
+# Function to convert the txt file to DataFrame
+def convert_txt_to_dataframe(file_path):
+    with open(file_path, 'r') as file:
+        lines = file.readlines()
+    
+    data = []
+    for line in lines:
+        values = line.strip().split(", ")
+        if len(values) == 3:
+            gx, gy, gz = values
+            gx = float(gx.split('=')[1])
+            gy = float(gy.split('=')[1])
+            gz = float(gz.split('=')[1])
+            data.append([gx, gy, gz])
+    
+    df = pd.DataFrame(data, columns=['gx', 'gy', 'gz'])
+    return df
+
+# Normalize signal using min-max normalization (between -1 and 1)
+def normalize_signal(df):
+    return (df - df.min()) / (df.max() - df.min()) * 2 - 1
+
+# Smoothen the normalized signals using Savitzky-Golay filter
+def smooth_signal(df):
+    return df.apply(lambda x: savgol_filter(x, window_length=5, polyorder=2))
+
+# Function to calculate cross-correlation
+def cross_correlation(signal1, signal2):
+    len1 = len(signal1)
+    len2 = len(signal2)
+    max_lag = len1 + len2 - 1
+    correlation = [0] * max_lag
+    
+    # Calculate raw cross-correlation
+    for lag in range(-len2 + 1, len1):
+        for n in range(len1):
+            if 0 <= n + lag < len2:
+                correlation[lag + len2 - 1] += signal1[n] * signal2[n + lag]
+    
+    # Normalize the correlation result
+    norm_signal1 = np.sqrt(np.sum(np.square(signal1)))
+    norm_signal2 = np.sqrt(np.sum(np.square(signal2)))
+    
+    # Avoid division by zero
+    norm_factor = norm_signal1 * norm_signal2
+    if norm_factor != 0:
+        correlation = [c / norm_factor for c in correlation]
+    
+    max_corr_value = max(abs(corr) for corr in correlation)
+    
+    # Generate lags
+    lags = list(range(-len2 + 1, len1))
+    
+    return correlation, lags, max_corr_value
+
+# Function to calculate convolution
+def convolution(signal1, signal2):
+    len1 = len(signal1)
+    len2 = len(signal2)
+    conv_length = len1 + len2 - 1
+    conv_result = [0] * conv_length
+    
+    # Calculate convolution
+    for n in range(conv_length):
+        for m in range(len1):
+            if 0 <= n - m < len2:
+                conv_result[n] += signal1[m] * signal2[n - m]
+    
+    max_conv_value = max(abs(val) for val in conv_result)
+    
+    return conv_result, max_conv_value
+
+# File paths (replace with your actual file paths)
+recorded_path = r'C:\Users\bkpou\OneDrive\Desktop\tests\recorded_gesture.txt'
+testing_path = r'C:\Users\bkpou\OneDrive\Desktop\tests\testing_data.txt'
+
+# Convert to DataFrames
+recorded = convert_txt_to_dataframe(recorded_path)
+testing = convert_txt_to_dataframe(testing_path)
+
+# Normalize the signals
+recorded_normalized = normalize_signal(recorded)
+testing_normalized = normalize_signal(testing)
+
+# Apply smoothing to the normalized signals
+recorded_smoothed = smooth_signal(recorded_normalized)
+testing_smoothed = smooth_signal(testing_normalized)
+
+# Extract signals as lists for cross-correlation and convolution calculations
+gx_recorded = recorded_smoothed['gx'].tolist()
+gx_testing = testing_smoothed['gx'].tolist()
+gy_recorded = recorded_smoothed['gy'].tolist()
+gy_testing = testing_smoothed['gy'].tolist()
+gz_recorded = recorded_smoothed['gz'].tolist()
+gz_testing = testing_smoothed['gz'].tolist()
+
+# Calculate cross-correlation and convolution for smoothed signals (for gx axis as an example)
+corr_gx, lags_gx, max_corr_gx = cross_correlation(gx_recorded, gx_testing)
+conv_gx, max_conv_gx = convolution(gx_recorded, gx_testing)
+corr_gy, lags_gy, max_corr_gy = cross_correlation(gy_recorded, gy_testing)
+conv_gy, max_conv_gy = convolution(gy_recorded, gy_testing)
+corr_gz, lags_gz, max_corr_gz = cross_correlation(gz_recorded, gz_testing)
+conv_gz, max_conv_gz = convolution(gz_recorded, gz_testing)
+
+# Convert max correlation value to percentage
+percent_corr_gx = (max_corr_gx) * 100  # Now max_corr_gx should be between -1 and 1
+percent_corr_gy = (max_corr_gy) * 100  # Now max_corr_gx should be between -1 and 1
+percent_corr_gz = (max_corr_gz) * 100  # Now max_corr_gx should be between -1 and 1
+percent_conv_gx = (max_conv_gx) * 100  # Now max_conv_gx should be between -1 and 1
+percent_conv_gy = (max_conv_gy) * 100  # Now max_conv_gx should be between -1 and 1
+percent_conv_gz = (max_conv_gz) * 100  # Now max_conv_gx should be between -1 and 1
+
+
+# Plotting normalized and smoothed signals for each axis
+fig, axs = plt.subplots(5, 1, figsize=(12, 20))
+
+axes = ['gx', 'gy', 'gz']
+for i, ax in enumerate(axes):
+    axs[i].plot(recorded_normalized[ax], label='Recorded (Normalized)', alpha=0.6)
+    axs[i].plot(recorded_smoothed[ax], label='Recorded (Smoothed)', alpha=0.8)
+    axs[i].plot(testing_normalized[ax], label='Testing (Normalized)', alpha=0.6)
+    axs[i].plot(testing_smoothed[ax], label='Testing (Smoothed)', alpha=0.8)
+    axs[i].set_title(f'{ax} - Normalized and Smoothed Signals')
+    axs[i].legend()
+
+# Plot cross-correlation for gx axis
+axs[3].plot(lags_gx, corr_gx)
+axs[3].set_title(f'Cross-Correlation (gx) - Max Correlation: {percent_corr_gx:.2f}%')
+
+# Plot convolution for gx axis
+axs[4].plot(conv_gx)
+axs[4].set_title(f'Convolution (gx) - Max Convolution Value: {percent_conv_gx:.2f}%')
+
+plt.tight_layout()
+plt.show()
+
+# Print results for gx axis as percentages
+print(f"Cross-correlation (gx): Max correlation = {percent_corr_gx:.2f}%")
+print(f"Convolution (gx): Max convolution value = {percent_conv_gx:.2f}%")
+print(f"Cross-correlation (gy): Max correlation = {percent_corr_gy:.2f}%")
+print(f"Convolution (gy): Max convolution value = {percent_conv_gy:.2f}%")
+print(f"Cross-correlation (gz): Max correlation = {percent_corr_gz:.2f}%")
+print(f"Convolution (gz): Max convolution value = {percent_conv_gz:.2f}%")
+
+# Calculate overall similarity scores for all axes based on correlation and convolution
+correlation_similarity_mean = np.mean([cross_correlation(recorded_smoothed[axis].tolist(), testing_smoothed[axis].tolist())[2] for axis in axes])
+convolution_similarity_mean = np.mean([convolution(recorded_smoothed[axis].tolist(), testing_smoothed[axis].tolist())[1] for axis in axes])
+
+# Convert overall scores to percentages
+overall_percent_corr_similarity = (correlation_similarity_mean / 1.0) * 100  # Assuming normalized signals.
+overall_percent_conv_similarity = (convolution_similarity_mean / 1.0) * 100
+
+print(f"\nOverall correlation similarity: {overall_percent_corr_similarity:.2f}%")
+print(f"Overall convolution similarity: {overall_percent_conv_similarity:.2f}%")
+
+# Set thresholds for similarity determination 
+similarity_threshold_percentage = 80.0  
+
+is_similar_correlation = overall_percent_corr_similarity >= similarity_threshold_percentage
+is_similar_convolution = overall_percent_conv_similarity >= similarity_threshold_percentage
+
+print(f"\nSignals are {'similar' if is_similar_correlation else 'not similar'} based on correlation.")
+print(f"Signals are {'similar' if is_similar_convolution else 'not similar'} based on convolution.")
