@@ -113,10 +113,8 @@ void record_key() {
         } else {
             key_recording = false;
             led_controller.turn_off_green();
-            led_controller.turn_off_red();
             sample_count = 0;
             sample_timer.stop();
-            led_controller.turn_off_green();
         }
     }
 }
@@ -142,10 +140,8 @@ void record_gesture_data() {
             } else {
                 recording = false;
                 led_controller.turn_off_green();
-                led_controller.turn_off_red();
                 sample_count = 0;
                 sample_timer.stop();
-                led_controller.turn_off_green();
             }
         }
     }
