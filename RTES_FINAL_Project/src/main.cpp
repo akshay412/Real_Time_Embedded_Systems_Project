@@ -72,7 +72,7 @@ void calibrate_sensor() {
     gx_offset = find_mode(gx_samples);
     gy_offset = find_mode(gy_samples);
     gz_offset = find_mode(gz_samples);
-    printf("Calibration complete. Offsets: gx=%f, gy=%f, gz=%f\n", gx_offset, gy_offset, gz_offset);
+    printf("Calibration complete: gx_offset=%f, gy_offset=%f, gz_offset=%f\n", gx_offset, gy_offset, gz_offset);
 }
 
 // Function to apply median filter
@@ -90,6 +90,43 @@ void apply_median_filter(float& gx, float& gy, float& gz) {
     gy = find_median(temp_y);
     gz = find_median(temp_z);
 }
+
+// High-pass filter constants
+const float ALPHA = 0.9;
+float prev_gx = 0, prev_gy = 0, prev_gz = 0;
+
+// Function to filter out sudden high/low spikes in data
+void filter_spikes(float& gx, float& gy, float& gz) {
+    const float SPIKE_THRESHOLD = 5.0; // Adjust threshold as needed
+
+    if (abs(gx - prev_gx) > SPIKE_THRESHOLD) gx = prev_gx;
+    if (abs(gy - prev_gy) > SPIKE_THRESHOLD) gy = prev_gy;
+    if (abs(gz - prev_gz) > SPIKE_THRESHOLD) gz = prev_gz;
+}
+
+// Function to apply high-pass filter with attenuation and spike filtering
+void apply_high_pass_filter(float& gx, float& gy, float& gz) {
+    float filtered_gx = ALPHA * (prev_gx + gx - prev_gx);
+    float filtered_gy = ALPHA * (prev_gy + gy - prev_gy);
+    float filtered_gz = ALPHA * (prev_gz + gz - prev_gz);
+
+    // Filter out sudden spikes
+    filter_spikes(filtered_gx, filtered_gy, filtered_gz);
+
+    prev_gx = gx;
+    prev_gy = gy;
+    prev_gz = gz;
+
+    // Attenuate signal values between -1.3 and 1.3 to zero
+    if (filtered_gx > -1.3 && filtered_gx < 1.3) filtered_gx = 0;
+    if (filtered_gy > -1.3 && filtered_gy < 1.3) filtered_gy = 0;
+    if (filtered_gz > -1.3 && filtered_gz < 1.3) filtered_gz = 0;
+
+    gx = filtered_gx;
+    gy = filtered_gy;
+    gz = filtered_gz;
+}
+
 //Printing data
 void print_data(float buffer[MAX_SAMPLES][3]) {
     for (int i = 0; i < MAX_SAMPLES; ++i) {
@@ -107,6 +144,7 @@ void record_key() {
             gy-=gy_offset;
             gz-=gz_offset;
             apply_median_filter(gx, gy, gz);
+            apply_high_pass_filter(gx, gy, gz);
             recorded_gesture_data[sample_count][0] = gx;
             recorded_gesture_data[sample_count][1] = gy;
             recorded_gesture_data[sample_count][2] = gz;
@@ -134,6 +172,7 @@ void record_gesture_data() {
             gy-=gy_offset;
             gz-=gz_offset;
             apply_median_filter(gx, gy, gz);
+            apply_high_pass_filter(gx, gy, gz);
                 gesture_data[sample_count][0] = gx;
                 gesture_data[sample_count][1] = gy;
                 gesture_data[sample_count][2] = gz;
@@ -152,34 +191,48 @@ void record_gesture_data() {
 }
 
 
+// Timer for adjustment time
+Timer adjustment_timer;
+bool adjustment_time_elapsed = false;
+
 // ISR for button press (start recording)
 void button_pressed_isr() {
-        recording = true;
+    recording = true;
+    adjustment_timer.reset();
+    adjustment_timer.start();
+    adjustment_time_elapsed = false;
 }
 
 // Main function
 int main() {
     led_controller.turn_on_red();
     led_controller.turn_off_green();
-    key_recording=true;
-    recording=false;
+    key_recording = true;
+    recording = false;
     // Initialize SPI
     init_spi(spi, write_buf, read_buf);
-    thread_sleep_for(1000);
+    thread_sleep_for(1500);
     // Calibrate sensor
-    calibrate_sensor();
-    thread_sleep_for(5000);
+    //calibrate_sensor();
+    //thread_sleep_for(5000);
     // Start the sample timer once, not resetting it until necessary
     
     // Attach the ISR to the button press event
     button.fall(&button_pressed_isr); // Use falling edge for button press
     while (1) {
         // Call the appropriate function based on the recording state
-        if(key_recording) {
+        if (key_recording) {
             record_key();
         } else {
-            if(recording) {
-                record_gesture_data();
+            if (recording) {
+                if (!adjustment_time_elapsed) {
+                    if (adjustment_timer.read_ms() >= 1500) {
+                        adjustment_time_elapsed = true;
+                        adjustment_timer.stop();
+                    }
+                } else {
+                    record_gesture_data();
+                }
             }
         }
     }
