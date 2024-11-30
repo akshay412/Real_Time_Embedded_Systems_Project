@@ -91,42 +91,6 @@ void apply_median_filter(float& gx, float& gy, float& gz) {
     gz = find_median(temp_z);
 }
 
-// High-pass filter constants
-const float ALPHA = 0.9;
-float prev_gx = 0, prev_gy = 0, prev_gz = 0;
-
-// Function to filter out sudden high/low spikes in data
-void filter_spikes(float& gx, float& gy, float& gz) {
-    const float SPIKE_THRESHOLD = 5.0; // Adjust threshold as needed
-
-    if (abs(gx - prev_gx) > SPIKE_THRESHOLD) gx = prev_gx;
-    if (abs(gy - prev_gy) > SPIKE_THRESHOLD) gy = prev_gy;
-    if (abs(gz - prev_gz) > SPIKE_THRESHOLD) gz = prev_gz;
-}
-
-// Function to apply high-pass filter with attenuation and spike filtering
-void apply_high_pass_filter(float& gx, float& gy, float& gz) {
-    float filtered_gx = ALPHA * (prev_gx + gx - prev_gx);
-    float filtered_gy = ALPHA * (prev_gy + gy - prev_gy);
-    float filtered_gz = ALPHA * (prev_gz + gz - prev_gz);
-
-    // Filter out sudden spikes
-    filter_spikes(filtered_gx, filtered_gy, filtered_gz);
-
-    prev_gx = gx;
-    prev_gy = gy;
-    prev_gz = gz;
-
-    // Attenuate signal values between -1.3 and 1.3 to zero
-    if (filtered_gx > -1.3 && filtered_gx < 1.3) filtered_gx = 0;
-    if (filtered_gy > -1.3 && filtered_gy < 1.3) filtered_gy = 0;
-    if (filtered_gz > -1.3 && filtered_gz < 1.3) filtered_gz = 0;
-
-    gx = filtered_gx;
-    gy = filtered_gy;
-    gz = filtered_gz;
-}
-
 //Printing data
 void print_data(float buffer[MAX_SAMPLES][3]) {
     for (int i = 0; i < MAX_SAMPLES; ++i) {
@@ -144,7 +108,6 @@ void record_key() {
             gy-=gy_offset;
             gz-=gz_offset;
             apply_median_filter(gx, gy, gz);
-            apply_high_pass_filter(gx, gy, gz);
             recorded_gesture_data[sample_count][0] = gx;
             recorded_gesture_data[sample_count][1] = gy;
             recorded_gesture_data[sample_count][2] = gz;
@@ -172,7 +135,6 @@ void record_gesture_data() {
             gy-=gy_offset;
             gz-=gz_offset;
             apply_median_filter(gx, gy, gz);
-            apply_high_pass_filter(gx, gy, gz);
                 gesture_data[sample_count][0] = gx;
                 gesture_data[sample_count][1] = gy;
                 gesture_data[sample_count][2] = gz;
