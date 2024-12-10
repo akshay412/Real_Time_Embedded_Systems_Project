@@ -267,21 +267,50 @@ std::string final_pattern(const std::pair<std::string, std::vector<int>> x, cons
 }
 
 std::string sortSubstring(const std::string input){
-    std::string op, substring;
-    for(char c : input){
-        if(c == ','){
-            std::sort(substring.begin(), substring.end());
-            op += substring;
-            op += c;
-            substring = "";
-        }
-        else{
-            substring += c;
+    std::vector<std::string> intervals;
+    std::string current;
+    
+    // Split the input string into intervals
+    for (char c : input) {
+        if (c == ',') {
+            if (!current.empty()) {
+                intervals.push_back(current);
+                current.clear();
+            }
+        } else {
+            current += c;
         }
     }
-    std::sort(substring.begin(), substring.end());
-    op += substring;
-    return op;
+    if (!current.empty()) {
+        intervals.push_back(current);
+    }
+    
+    std::string result;
+    
+    for (const auto& interval : intervals) {
+        std::string x, y, z;
+        
+        // Extract X, Y, and Z with their signs
+        for (size_t i = 0; i < interval.length(); ++i) {
+            if (interval[i] == 'X') {
+                x = "X" + (i + 1 < interval.length() ? std::string(1, interval[i + 1]) : "");
+            } else if (interval[i] == 'Y') {
+                y = "Y" + (i + 1 < interval.length() ? std::string(1, interval[i + 1]) : "");
+            } else if (interval[i] == 'Z') {
+                z = "Z" + (i + 1 < interval.length() ? std::string(1, interval[i + 1]) : "");
+            }
+        }
+        
+        // Reorder X, Y, and Z
+        std::string reordered;
+        if (!x.empty()) reordered += x;
+        if (!y.empty()) reordered += y;
+        if (!z.empty()) reordered += z;
+        
+        result += "," + reordered;
+    }
+    
+    return result;
 }
 
 int main()
