@@ -9,6 +9,9 @@ TEAM MEMBERS    : Akshay Hemant Paralikar (ap8235),
                   Rugved Rajendra Mhatre (rrm9598),
                   Bibek Poudel (bp2376)
 
+VIDEO LINK      : https://youtu.be/Wg8uC9wbMRM
+GITHUB          : https://github.com/rugvedmhatre/Embedded-Sentry
+
 ================================================================
 */
 
