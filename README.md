@@ -2,6 +2,11 @@
 
 Embedded Sentry is an embedded system that provides a mechanism to lock/unlock the device using one's gestures. This project is designed for the 32F429IDISCOVERY board using PlatformIO.
 
+## Authors
+- Akshay Paralikar (ap8235)
+- Rugved Mhatre (rrm9598)
+- Bibek Poudel (bp2376)
+
 ## Requirements
 
 - **Board**: 32F429IDISCOVERY
@@ -64,4 +69,4 @@ These drivers provide the necessary support for interacting with the gyroscope a
 
 Here is a video demonstrating the project in action:
 
-
+[![alt text](https://github.com/rugvedmhatre/Embedded-Sentry/blob/main/thumbnail.png?raw=true)](https://youtu.be/Wg8uC9wbMRM)
